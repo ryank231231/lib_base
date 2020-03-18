@@ -144,21 +144,28 @@ QString DeviceModelPretty() {
 	return "PC";
 }
 
+QString Is64BitOS() {
+	if (_WIN64)
+		return " x64";
+	else
+		return "";
+}
+
 QString SystemVersionPretty() {
 	if (IsWindows10OrGreater()) {
-		return "Windows 10";
+		return "Windows 10"+Is64BitOS();
 	} else if (IsWindows8Point1OrGreater()) {
-		return "Windows 8.1";
+		return "Windows 8.1"+Is64BitOS();
 	} else if (IsWindows8OrGreater()) {
-		return "Windows 8";
+		return "Windows 8"+Is64BitOS();
 	} else if (IsWindows7OrGreater()) {
-		return "Windows 7";
+		return "Windows 7"+Is64BitOS();
 	} else if (IsWindowsVistaOrGreater()) {
-		return "Windows Vista";
+		return "Windows Vista"+Is64BitOS();
 	} else if (IsWindowsXPOrGreater()) {
-		return "Windows XP";
+		return "Windows XP"+Is64BitOS();
 	} else {
-		return QSysInfo::prettyProductName();
+		return QSysInfo::prettyProductName()+Is64BitOS();
 	}
 }
 
