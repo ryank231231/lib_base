@@ -144,12 +144,15 @@ QString DeviceModelPretty() {
 	return "PC";
 }
 
-QString Is64BitOS() {
-	if (_WIN64)
+#ifdef _WIN64
+	QString Is64BitOS() {
 		return " x64";
-	else
+	}
+#else
+	QString Is64BitOS() {
 		return "";
-}
+	}
+#endif
 
 QString SystemVersionPretty() {
 	if (IsWindows10OrGreater()) {
