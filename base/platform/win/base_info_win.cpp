@@ -143,16 +143,13 @@ QString GetLangCodeById(unsigned int lngId) {
 QString DeviceModelPretty() {
 	return "PC";
 }
-
-#ifdef _WIN64
-	QString Is64BitOS() {
-		return " x64";
-	}
-#else
-	QString Is64BitOS() {
+QString Is64BitOS() {
+	#ifdef Q_OS_WIN64
+		return "x64";
+	#else
 		return "";
-	}
-#endif
+	#endif
+}
 
 QString SystemVersionPretty() {
 	if (IsWindows10OrGreater()) {
@@ -240,7 +237,11 @@ int AutoUpdateVersion() {
 }
 
 QString AutoUpdateKey() {
-	return "win";
+	#ifdef Q_OS_WIN64
+		return "win";
+	#else
+	    return "win32";
+	#endif
 }
 
 bool IsWindowsXPOrGreater() {
