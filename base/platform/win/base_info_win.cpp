@@ -145,7 +145,7 @@ QString DeviceModelPretty() {
 }
 QString Is64BitOS() {
 	#ifdef Q_OS_WIN64
-		return "x64";
+		return " x64";
 	#else
 		return "";
 	#endif
