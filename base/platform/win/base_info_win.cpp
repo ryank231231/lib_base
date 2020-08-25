@@ -141,35 +141,31 @@ QString GetLangCodeById(unsigned int lngId) {
 } // namespace
 
 QString DeviceModelPretty() {
-	auto bIsWow64 = BOOL(FALSE);
-	if (IsWow64Process(GetCurrentProcess(), &bIsWow64)) {
-		return bIsWow64 ? "PC 64bit" : "PC 32bit";
+	QString arch = QSysInfo::currentCpuArchitecture();
+	if (arch == "x86_64") {
+		return "PC 64bit";
+	} else if (arch == "i386") {
+		return "PC 32bit";
+	} else {
+		return "PC Unknown";
 	}
-	return "PC unknown";
-}
-QString Is64BitOS() {
-	#ifdef Q_OS_WIN64
-		return " x64";
-	#else
-		return "";
-	#endif
 }
 
 QString SystemVersionPretty() {
 	if (IsWindows10OrGreater()) {
-		return "Windows 10"+Is64BitOS();
+		return "Windows 10";
 	} else if (IsWindows8Point1OrGreater()) {
-		return "Windows 8.1"+Is64BitOS();
+		return "Windows 8.1";
 	} else if (IsWindows8OrGreater()) {
-		return "Windows 8"+Is64BitOS();
+		return "Windows 8";
 	} else if (IsWindows7OrGreater()) {
-		return "Windows 7"+Is64BitOS();
+		return "Windows 7";
 	} else if (IsWindowsVistaOrGreater()) {
-		return "Windows Vista"+Is64BitOS();
+		return "Windows Vista";
 	} else if (IsWindowsXPOrGreater()) {
-		return "Windows XP"+Is64BitOS();
+		return "Windows XP";
 	} else {
-		return QSysInfo::prettyProductName()+Is64BitOS();
+		return QSysInfo::prettyProductName();
 	}
 }
 
