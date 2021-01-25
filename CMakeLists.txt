@@ -64,8 +64,11 @@ PRIVATE
     base/platform/win/base_url_scheme_win.cpp
     base/platform/win/base_url_scheme_win.h
     base/platform/win/base_windows_h.h
+    base/platform/win/base_windows_wrl.cpp
+    base/platform/win/base_windows_wrl.h
     base/platform/win/base_windows_safe_library.cpp
     base/platform/win/base_windows_safe_library.h
+    base/platform/win/wrl/wrl_implements_h.h
     base/platform/base_platform_global_shortcuts.h
     base/platform/base_platform_info.h
     base/platform/base_platform_last_input.h
@@ -177,7 +180,8 @@ if (LINUX)
     )
 endif()
 
-target_precompile_headers(lib_base_crash_report_writer REUSE_FROM lib_base)
+#target_precompile_headers(lib_base_crash_report_writer REUSE_FROM lib_base)
+target_precompile_headers(lib_base_crash_report_writer PRIVATE ${src_loc}/base/base_pch.h)
 nice_target_sources(lib_base_crash_report_writer ${src_loc}
 PRIVATE
     base/crash_report_header.cpp
