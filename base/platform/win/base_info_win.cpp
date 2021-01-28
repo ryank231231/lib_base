@@ -242,7 +242,7 @@ QString AutoUpdateKey() {
 	#ifdef Q_OS_WIN64
 		return "win";
 	#else
-	    return "win32";
+		return "win32";
 	#endif
 }
 
