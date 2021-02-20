@@ -4,7 +4,7 @@
 // For license and copyright information please follow this link:
 // https://github.com/desktop-app/legal/blob/master/LEGAL
 //
-#include "base/platform/linux/base_xcb_utilities_linux.h"
+#include "base/platform/linux/base_linux_xcb_utilities.h"
 
 #include <QtGui/QGuiApplication>
 #include <qpa/qplatformnativeinterface.h>
@@ -61,7 +61,7 @@ std::optional<xcb_atom_t> GetAtom(
 		connection,
 		0,
 		name.size(),
-		name.toUtf8());
+		name.toUtf8().constData());
 
 	auto reply = xcb_intern_atom_reply(
 		connection,
