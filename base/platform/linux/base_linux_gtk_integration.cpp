@@ -7,9 +7,12 @@
 #include "base/platform/linux/base_linux_gtk_integration.h"
 
 #include "base/platform/linux/base_linux_gtk_integration_p.h"
-#include "base/platform/linux/base_linux_xlib_helper.h"
 #include "base/platform/base_platform_info.h"
 #include "base/integration.h"
+
+#ifndef DESKTOP_APP_DISABLE_X11_INTEGRATION
+#include "base/platform/linux/base_linux_xlib_helper.h"
+#endif // !DESKTOP_APP_DISABLE_X11_INTEGRATION
 
 #include <QtGui/QIcon>
 
@@ -87,10 +90,12 @@ bool SetupGtkBase(QLibrary &lib) {
 		}
 	}
 
+#ifndef DESKTOP_APP_DISABLE_X11_INTEGRATION
 	// gtk_init will reset the Xlib error handler,
 	// and that causes Qt applications to quit on X errors.
 	// Therefore, we need to manually restore it.
 	XErrorHandlerRestorer handlerRestorer;
+#endif // !DESKTOP_APP_DISABLE_X11_INTEGRATION
 
 	Integration::Instance().logMessage("Library gtk functions loaded!");
 	TriedToInit = true;
@@ -110,16 +115,12 @@ bool SetupGtkBase(QLibrary &lib) {
 
 template <typename T>
 std::optional<T> GtkSetting(const QString &propertyName) {
-	const auto integration = GtkIntegration::Instance();
-	if (!integration
-		|| !integration->loaded()
-		|| gtk_settings_get_default == nullptr) {
+	if (gtk_settings_get_default == nullptr) {
 		return std::nullopt;
 	}
-	auto settings = gtk_settings_get_default();
 	T value;
 	g_object_get(
-		settings,
+		gtk_settings_get_default(),
 		propertyName.toUtf8().constData(),
 		&value,
 		nullptr);
@@ -152,7 +153,7 @@ bool CursorSizeShouldBeSet() {
 }
 
 void SetIconTheme() {
-	Integration::Instance().enterFromEventLoop([] {
+	static const auto setter = [] {
 		const auto integration = GtkIntegration::Instance();
 		if (!integration || !IconThemeShouldBeSet()) {
 			return;
@@ -180,11 +181,17 @@ void SetIconTheme() {
 		Integration::Instance().logMessage(
 			QString("New fallback icon theme: %1")
 				.arg(QIcon::fallbackThemeName()));
-	});
+	};
+
+	if (QCoreApplication::instance()) {
+		Integration::Instance().enterFromEventLoop(setter);
+	} else {
+		setter();
+	}
 }
 
 void SetCursorSize() {
-	Integration::Instance().enterFromEventLoop([] {
+	static const auto setter = [] {
 		const auto integration = GtkIntegration::Instance();
 		if (!integration || !CursorSizeShouldBeSet()) {
 			return;
@@ -201,7 +208,13 @@ void SetCursorSize() {
 		qputenv("XCURSOR_SIZE", QByteArray::number(*newCursorSize));
 		Integration::Instance().logMessage(
 			QString("New cursor size: %1").arg(*newCursorSize));
-	});
+	};
+
+	if (QCoreApplication::instance()) {
+		Integration::Instance().enterFromEventLoop(setter);
+	} else {
+		setter();
+	}
 }
 
 } // namespace
@@ -255,6 +268,14 @@ void GtkIntegration::load() {
 	Expects(!loaded());
 	Integration::Instance().logMessage("Loading GTK");
 
+	Integration::Instance().logMessage(
+		QString("Icon theme: %1")
+			.arg(QIcon::themeName()));
+
+	Integration::Instance().logMessage(
+		QString("Fallback icon theme: %1")
+			.arg(QIcon::fallbackThemeName()));
+
 	_lib.setLoadHints(QLibrary::DeepBindHint);
 
 	if (LoadLibrary(_lib, "gtk-3", 0)) {
@@ -284,7 +305,7 @@ bool GtkIntegration::loaded() const {
 }
 
 bool GtkIntegration::checkVersion(uint major, uint minor, uint micro) const {
-	return (loaded() && gtk_check_version != nullptr)
+	return (gtk_check_version != nullptr)
 		? !gtk_check_version(major, minor, micro)
 		: false;
 }
@@ -332,7 +353,7 @@ std::optional<QString> GtkIntegration::getStringSetting(
 void GtkIntegration::connectToSetting(
 		const QString &propertyName,
 		void (*callback)()) {
-	if (!loaded() || gtk_settings_get_default == nullptr) {
+	if (gtk_settings_get_default == nullptr) {
 		return;
 	}
 
