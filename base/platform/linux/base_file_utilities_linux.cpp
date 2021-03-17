@@ -167,7 +167,7 @@ bool ShowInFolder(const QString &filepath) {
 		return true;
 	}
 
-	if (!QProcess::execute("xdg-open", { qUrlFolder.toEncoded() })) {
+	if (QProcess::startDetached("xdg-open", { qUrlFolder.toEncoded() })) {
 		return true;
 	}
 
@@ -182,7 +182,7 @@ QString CurrentExecutablePath(int argc, char *argv[]) {
 		auto filename = QFile::decodeName(result);
 		auto deletedPostfix = qstr(" (deleted)");
 		if (filename.endsWith(deletedPostfix)
-			&& !QFileInfo(filename).exists()) {
+			&& !QFileInfo::exists(filename)) {
 			filename.chop(deletedPostfix.size());
 		}
 		return filename;
