@@ -9,6 +9,7 @@
 #include "base/platform/linux/base_linux_gtk_integration_p.h"
 #include "base/platform/base_platform_info.h"
 #include "base/integration.h"
+#include "base/debug_log.h"
 
 #ifndef DESKTOP_APP_DISABLE_X11_INTEGRATION
 #include "base/platform/linux/base_linux_xlib_helper.h"
@@ -18,44 +19,48 @@
 
 namespace base {
 namespace Platform {
-
-using namespace Gtk;
-
-namespace {
-
-bool TriedToInit = false;
-bool Loaded = false;
+namespace Gtk {
 
 bool LoadLibrary(QLibrary &lib, const char *name, int version) {
 #ifdef LINK_TO_GTK
 	return true;
 #else // LINK_TO_GTK
-	Integration::Instance().logMessage(
-		QString("Loading '%1' with version %2...")
-			.arg(QLatin1String(name))
-			.arg(version));
+	DEBUG_LOG(("Loading '%1' with version %2...")
+		.arg(QLatin1String(name))
+		.arg(version));
 	lib.setFileNameAndVersion(QLatin1String(name), version);
 	if (lib.load()) {
-		Integration::Instance().logMessage(
-			QString("Loaded '%1' with version %2!")
-				.arg(QLatin1String(name))
-				.arg(version));
+		DEBUG_LOG(("Loaded '%1' with version %2!")
+			.arg(QLatin1String(name))
+			.arg(version));
 		return true;
+	} else {
+		DEBUG_LOG(("Could not load '%1' with version %2! Error: %3")
+			.arg(QLatin1String(name))
+			.arg(version)
+			.arg(lib.errorString()));
 	}
 	lib.setFileNameAndVersion(QLatin1String(name), QString());
 	if (lib.load()) {
-		Integration::Instance().logMessage(
-			QString("Loaded '%1' without version!")
-				.arg(QLatin1String(name)));
+		DEBUG_LOG(("Loaded '%1' without version!").arg(QLatin1String(name)));
 		return true;
-	}
-	Integration::Instance().logMessage(
-		QString("Could not load '%1' with version %2 :(")
+	} else {
+		LOG(("Could not load '%1' without version! Error: %2")
 			.arg(QLatin1String(name))
-			.arg(version));
+			.arg(lib.errorString()));
+	}
 	return false;
 #endif // !LINK_TO_GTK
 }
+
+} // namespace Gtk
+
+namespace {
+
+using namespace Gtk;
+
+bool TriedToInit = false;
+bool Loaded = false;
 
 void GtkMessageHandler(
 		const gchar *log_domain,
@@ -72,40 +77,39 @@ void GtkMessageHandler(
 }
 
 bool SetupGtkBase(QLibrary &lib) {
-	if (!LOAD_GTK_SYMBOL(lib, "gtk_init_check", gtk_init_check)) return false;
+	if (!LOAD_GTK_SYMBOL(lib, gtk_init_check)) return false;
 
-	if (LOAD_GTK_SYMBOL(lib, "gdk_set_allowed_backends", gdk_set_allowed_backends)) {
+	if (LOAD_GTK_SYMBOL(lib, gdk_set_allowed_backends)) {
 		// We work only with Wayland and X11 GDK backends.
 		// Otherwise we get segfault in Ubuntu 17.04 in gtk_init_check() call.
 		// See https://github.com/telegramdesktop/tdesktop/issues/3176
 		// See https://github.com/telegramdesktop/tdesktop/issues/3162
 		if (::Platform::IsWayland()) {
-			Integration::Instance().logMessage(
-				"Limit allowed GDK backends to wayland,x11");
+			DEBUG_LOG(("Limit allowed GDK backends to wayland,x11"));
 			gdk_set_allowed_backends("wayland,x11");
 		} else if (::Platform::IsX11()) {
-			Integration::Instance().logMessage(
-				"Limit allowed GDK backends to x11,wayland");
+			DEBUG_LOG(("Limit allowed GDK backends to x11,wayland"));
 			gdk_set_allowed_backends("x11,wayland");
 		}
 	}
 
 #ifndef DESKTOP_APP_DISABLE_X11_INTEGRATION
+	InitXThreads();
+
 	// gtk_init will reset the Xlib error handler,
 	// and that causes Qt applications to quit on X errors.
 	// Therefore, we need to manually restore it.
 	XErrorHandlerRestorer handlerRestorer;
 #endif // !DESKTOP_APP_DISABLE_X11_INTEGRATION
 
-	Integration::Instance().logMessage("Library gtk functions loaded!");
+	DEBUG_LOG(("Library gtk functions loaded!"));
 	TriedToInit = true;
 	if (!gtk_init_check(0, 0)) {
 		gtk_init_check = nullptr;
-		Integration::Instance().logMessage(
-			"Failed to gtk_init_check(0, 0)!");
+		DEBUG_LOG(("Failed to gtk_init_check(0, 0)!"));
 		return false;
 	}
-	Integration::Instance().logMessage("Checked gtk with gtk_init_check!");
+	DEBUG_LOG(("Checked gtk with gtk_init_check!"));
 
 	// Use our custom log handler.
 	g_log_set_handler("Gtk", G_LOG_LEVEL_MESSAGE, GtkMessageHandler, nullptr);
@@ -169,18 +173,15 @@ void SetIconTheme() {
 			return;
 		}
 
-		Integration::Instance().logMessage("Setting GTK icon theme");
+		DEBUG_LOG(("Setting GTK icon theme"));
 
 		QIcon::setThemeName(*themeName);
 		QIcon::setFallbackThemeName(*fallbackThemeName);
 
-		Integration::Instance().logMessage(
-			QString("New icon theme: %1")
-				.arg(QIcon::themeName()));
+		DEBUG_LOG(("New icon theme: %1").arg(QIcon::themeName()));
 
-		Integration::Instance().logMessage(
-			QString("New fallback icon theme: %1")
-				.arg(QIcon::fallbackThemeName()));
+		DEBUG_LOG(("New fallback icon theme: %1")
+			.arg(QIcon::fallbackThemeName()));
 	};
 
 	if (QCoreApplication::instance()) {
@@ -204,10 +205,9 @@ void SetCursorSize() {
 			return;
 		}
 
-		Integration::Instance().logMessage("Setting GTK cursor size");
+		DEBUG_LOG(("Setting GTK cursor size"));
 		qputenv("XCURSOR_SIZE", QByteArray::number(*newCursorSize));
-		Integration::Instance().logMessage(
-			QString("New cursor size: %1").arg(*newCursorSize));
+		DEBUG_LOG(("New cursor size: %1").arg(*newCursorSize));
 	};
 
 	if (QCoreApplication::instance()) {
@@ -266,15 +266,10 @@ void GtkIntegration::prepareEnvironment() {
 
 void GtkIntegration::load() {
 	Expects(!loaded());
-	Integration::Instance().logMessage("Loading GTK");
 
-	Integration::Instance().logMessage(
-		QString("Icon theme: %1")
-			.arg(QIcon::themeName()));
-
-	Integration::Instance().logMessage(
-		QString("Fallback icon theme: %1")
-			.arg(QIcon::fallbackThemeName()));
+	DEBUG_LOG(("Loading GTK"));
+	DEBUG_LOG(("Icon theme: %1").arg(QIcon::themeName()));
+	DEBUG_LOG(("Fallback icon theme: %1").arg(QIcon::fallbackThemeName()));
 
 	_lib.setLoadHints(QLibrary::DeepBindHint);
 
@@ -288,16 +283,22 @@ void GtkIntegration::load() {
 	}
 
 	if (Loaded) {
-		LOAD_GTK_SYMBOL(_lib, "gtk_check_version", gtk_check_version);
-		LOAD_GTK_SYMBOL(_lib, "gtk_settings_get_default", gtk_settings_get_default);
-
-		SetIconTheme();
-		SetCursorSize();
-		connectToSetting("gtk-icon-theme-name", SetIconTheme);
-		connectToSetting("gtk-cursor-theme-size", SetCursorSize);
+		LOAD_GTK_SYMBOL(_lib, gtk_check_version);
+		LOAD_GTK_SYMBOL(_lib, gtk_settings_get_default);
 	} else {
-		Integration::Instance().logMessage("Could not load gtk-3 or gtk-x11-2.0!");
+		LOG(("Could not load gtk-3 or gtk-x11-2.0!"));
 	}
+}
+
+void GtkIntegration::initializeSettings() {
+	if (!loaded()) {
+		return;
+	}
+
+	SetIconTheme();
+	SetCursorSize();
+	connectToSetting("gtk-icon-theme-name", SetIconTheme);
+	connectToSetting("gtk-cursor-theme-size", SetCursorSize);
 }
 
 bool GtkIntegration::loaded() const {
@@ -316,10 +317,9 @@ std::optional<bool> GtkIntegration::getBoolSetting(
 	if (!value.has_value()) {
 		return std::nullopt;
 	}
-	Integration::Instance().logMessage(
-		QString("Getting GTK setting, %1: %2").arg(
-			propertyName,
-			*value ? "[TRUE]" : "[FALSE]"));
+	DEBUG_LOG(("Getting GTK setting, %1: %2").arg(
+		propertyName,
+		*value ? "[TRUE]" : "[FALSE]"));
 	return *value;
 }
 
@@ -327,10 +327,9 @@ std::optional<int> GtkIntegration::getIntSetting(
 		const QString &propertyName) const {
 	const auto value = GtkSetting<gint>(propertyName);
 	if (value.has_value()) {
-		Integration::Instance().logMessage(
-			QString("Getting GTK setting, %1: %2")
-				.arg(propertyName)
-				.arg(*value));
+		DEBUG_LOG(("Getting GTK setting, %1: %2")
+			.arg(propertyName)
+			.arg(*value));
 	}
 	return value;
 }
@@ -343,10 +342,7 @@ std::optional<QString> GtkIntegration::getStringSetting(
 	}
 	const auto str = QString::fromUtf8(*value);
 	g_free(*value);
-	Integration::Instance().logMessage(
-		QString("Getting GTK setting, %1: '%2'").arg(
-			propertyName,
-			str));
+	DEBUG_LOG(("Getting GTK setting, %1: '%2'").arg(propertyName, str));
 	return str;
 }
 

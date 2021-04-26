@@ -6,16 +6,25 @@
 //
 #include "base/platform/linux/base_url_scheme_linux.h"
 
-#include "base/integration.h"
+#include "base/platform/linux/base_linux_glibmm_helper.h"
+#include "base/const_string.h"
+#include "base/debug_log.h"
 
 #include <QtCore/QFile>
+#include <QtCore/QEventLoop>
+#include <QtGui/QWindow>
 
+#include <private/qguiapplication_p.h>
 #include <gio/gio.h>
 #include <glibmm.h>
 #include <giomm.h>
 
 namespace base::Platform {
 namespace {
+
+constexpr auto kSnapcraftSettingsService = "io.snapcraft.Settings"_cs;
+constexpr auto kSnapcraftSettingsObjectPath = "/io/snapcraft/Settings"_cs;
+constexpr auto kSnapcraftSettingsInterface = kSnapcraftSettingsService;
 
 [[nodiscard]] QByteArray EscapeShell(const QByteArray &content) {
 	auto result = QByteArray();
@@ -42,6 +51,70 @@ namespace {
 	}
 	return result;
 }
+
+#ifndef DESKTOP_APP_DISABLE_DBUS_INTEGRATION
+class SnapDefaultHandler : public QWindow {
+public:
+	SnapDefaultHandler(const QString &protocol);
+};
+
+SnapDefaultHandler::SnapDefaultHandler(const QString &protocol) {
+	try {
+		const auto connection = Gio::DBus::Connection::get_sync(
+			Gio::DBus::BusType::BUS_TYPE_SESSION);
+
+		auto reply = connection->call_sync(
+			std::string(kSnapcraftSettingsObjectPath),
+			std::string(kSnapcraftSettingsInterface),
+			"GetSub",
+			MakeGlibVariant(std::tuple{
+				Glib::ustring("default-url-scheme-handler"),
+				Glib::ustring(protocol.toStdString()),
+			}),
+			std::string(kSnapcraftSettingsService));
+
+		const auto currentHandler = GlibVariantCast<Glib::ustring>(
+			reply.get_child(0));
+
+		const auto expectedHandler = qEnvironmentVariable("SNAP_NAME")
+			+ ".desktop";
+
+		if (currentHandler == expectedHandler.toStdString()) {
+			return;
+		}
+
+		QEventLoop loop;
+
+		connection->call(
+			std::string(kSnapcraftSettingsObjectPath),
+			std::string(kSnapcraftSettingsInterface),
+			"SetSub",
+			MakeGlibVariant(std::tuple{
+				Glib::ustring("default-url-scheme-handler"),
+				Glib::ustring(protocol.toStdString()),
+				Glib::ustring(expectedHandler.toStdString()),
+			}),
+			[&](const Glib::RefPtr<Gio::AsyncResult> &result) {
+				try {
+					connection->call_finish(result);
+				} catch (const Glib::Error &e) {
+					LOG(("Snap Default Handler Error: %1")
+						.arg(QString::fromStdString(e.what())));
+				}
+
+				loop.quit();
+			},
+			std::string(kSnapcraftSettingsService));
+
+		QGuiApplicationPrivate::showModalWindow(this);
+		loop.exec();
+		QGuiApplicationPrivate::hideModalWindow(this);
+	} catch (const Glib::Error &e) {
+		LOG(("Snap Default Handler Error: %1")
+			.arg(QString::fromStdString(e.what())));
+	}
+}
+#endif // !DESKTOP_APP_DISABLE_DBUS_INTEGRATION
 
 } // namespace
 
@@ -72,6 +145,13 @@ bool CheckUrlScheme(const UrlSchemeDescriptor &descriptor) {
 
 void RegisterUrlScheme(const UrlSchemeDescriptor &descriptor) {
 	try {
+#ifndef DESKTOP_APP_DISABLE_DBUS_INTEGRATION
+		if (qEnvironmentVariableIsSet("SNAP")) {
+			SnapDefaultHandler(descriptor.protocol);
+			return;
+		}
+#endif // !DESKTOP_APP_DISABLE_DBUS_INTEGRATION
+
 		if (CheckUrlScheme(descriptor)) {
 			return;
 		}
@@ -93,7 +173,7 @@ void RegisterUrlScheme(const UrlSchemeDescriptor &descriptor) {
 			newAppInfo->set_as_default_for_type(handlerType.toStdString());
 		}
 	} catch (const Glib::Error &e) {
-		Integration::Instance().logMessage(QString::fromStdString(e.what()));
+		LOG(("Register Url Scheme Error: %1").arg(QString::fromStdString(e.what())));
 	}
 }
 

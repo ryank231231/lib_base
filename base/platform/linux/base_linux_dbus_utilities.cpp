@@ -17,27 +17,55 @@ bool NameHasOwner(
 		std::string(kDBusObjectPath),
 		std::string(kDBusInterface),
 		"NameHasOwner",
-		base::Platform::MakeGlibVariant(std::tuple{name}),
+		MakeGlibVariant(std::tuple{name}),
 		std::string(kDBusService));
 
-	const auto value = GlibVariantCast<bool>(reply.get_child(0));
-
-	return value;
+	return GlibVariantCast<bool>(reply.get_child(0));
 }
 
 std::vector<Glib::ustring> ListActivatableNames(
 		const Glib::RefPtr<Gio::DBus::Connection> &connection) {
 	auto reply = connection->call_sync(
-		kDBusObjectPath.utf8().toStdString(),
-		kDBusInterface.utf8().toStdString(),
+		std::string(kDBusObjectPath),
+		std::string(kDBusInterface),
 		"ListActivatableNames",
 		{},
-		kDBusService.utf8().toStdString());
+		std::string(kDBusService));
 
-	const auto value = GlibVariantCast<std::vector<Glib::ustring>>(
+	return GlibVariantCast<std::vector<Glib::ustring>>(
 		reply.get_child(0));
+}
 
-	return value;
+StartReply StartServiceByName(
+		const Glib::RefPtr<Gio::DBus::Connection> &connection,
+		const Glib::ustring &name) {
+	auto reply = connection->call_sync(
+		std::string(kDBusObjectPath),
+		std::string(kDBusInterface),
+		"StartServiceByName",
+		MakeGlibVariant(std::tuple{ name, uint(0) }),
+		std::string(kDBusService));
+
+	return StartReply(GlibVariantCast<uint>(reply.get_child(0)));
+}
+
+void StartServiceByNameAsync(
+		const Glib::RefPtr<Gio::DBus::Connection> &connection,
+		const Glib::ustring &name,
+		Fn<void(Fn<StartReply()>)> callback,
+		const Glib::RefPtr<Gio::Cancellable> &cancellable) {
+	connection->call(
+		std::string(kDBusObjectPath),
+		std::string(kDBusInterface),
+		"StartServiceByName",
+		MakeGlibVariant(std::tuple{ name, uint(0) }),
+		[=](const Glib::RefPtr<Gio::AsyncResult> &result) {
+			callback([=] {
+				auto reply = connection->call_finish(result);
+				return StartReply(GlibVariantCast<uint>(reply.get_child(0)));
+			});
+		},
+		std::string(kDBusService));
 }
 
 uint RegisterServiceWatcher(
@@ -58,14 +86,14 @@ uint RegisterServiceWatcher(
 			try {
 				auto parametersCopy = parameters;
 
-				const auto name = base::Platform::GlibVariantCast<
-					Glib::ustring>(parametersCopy.get_child(0));
+				const auto name = GlibVariantCast<Glib::ustring>(
+					parametersCopy.get_child(0));
 
-				const auto oldOwner = base::Platform::GlibVariantCast<
-					Glib::ustring>(parametersCopy.get_child(1));
+				const auto oldOwner = GlibVariantCast<Glib::ustring>(
+					parametersCopy.get_child(1));
 
-				const auto newOwner = base::Platform::GlibVariantCast<
-					Glib::ustring>(parametersCopy.get_child(2));
+				const auto newOwner = GlibVariantCast<Glib::ustring>(
+					parametersCopy.get_child(2));
 
 				if (name != service) {
 					return;
