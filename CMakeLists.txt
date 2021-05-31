@@ -27,12 +27,16 @@ PRIVATE
     base/platform/linux/base_last_input_linux.h
     base/platform/linux/base_layout_switch_linux.cpp
     base/platform/linux/base_layout_switch_linux.h
+    base/platform/linux/base_linux_allocation_tracer.cpp
+    base/platform/linux/base_linux_allocation_tracer.h
     base/platform/linux/base_linux_dbus_utilities.cpp
     base/platform/linux/base_linux_dbus_utilities.h
     base/platform/linux/base_linux_glibmm_helper.h
     base/platform/linux/base_linux_gtk_integration_p.h
     base/platform/linux/base_linux_gtk_integration.cpp
     base/platform/linux/base_linux_gtk_integration.h
+    base/platform/linux/base_linux_library.cpp
+    base/platform/linux/base_linux_library.h
     base/platform/linux/base_linux_xcb_utilities.cpp
     base/platform/linux/base_linux_xcb_utilities.h
     base/platform/linux/base_linux_xdp_utilities.cpp
@@ -250,7 +254,7 @@ if (LINUX)
                 target_link_libraries(lib_base PUBLIC PkgConfig::X11)
             endif()
         else()
-            pkg_search_module(GTK REQUIRED gtk+-3.0 gtk+-2.0)
+            pkg_check_modules(GTK REQUIRED gtk+-3.0)
             target_include_directories(lib_base PUBLIC ${GTK_INCLUDE_DIRS})
 
             if (NOT DESKTOP_APP_DISABLE_X11_INTEGRATION)
@@ -260,7 +264,16 @@ if (LINUX)
     endif()
 endif()
 
-target_compile_definitions(lib_base PRIVATE G_LOG_DOMAIN="lib_base")
+target_compile_definitions(lib_base
+PRIVATE
+    G_LOG_DOMAIN="lib_base"
+)
+if (DESKTOP_APP_USE_ALLOCATION_TRACER)
+    target_compile_definitions(lib_base
+    PRIVATE
+        DESKTOP_APP_USE_ALLOCATION_TRACER
+    )
+endif()
 
 #target_precompile_headers(lib_base_crash_report_writer REUSE_FROM lib_base)
 target_precompile_headers(lib_base_crash_report_writer PRIVATE ${src_loc}/base/base_pch.h)

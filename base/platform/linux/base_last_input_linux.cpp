@@ -72,8 +72,19 @@ std::optional<crl::time> FreedesktopDBusLastUserInputTime() {
 	}
 
 	try {
-		const auto connection = Gio::DBus::Connection::get_sync(
-			Gio::DBus::BusType::BUS_TYPE_SESSION);
+		const auto connection = [] {
+			try {
+				return Gio::DBus::Connection::get_sync(
+					Gio::DBus::BusType::BUS_TYPE_SESSION);
+			} catch (...) {
+				return Glib::RefPtr<Gio::DBus::Connection>();
+			}
+		}();
+
+		if (!connection) {
+			NotSupported = true;
+			return std::nullopt;
+		}
 
 		auto reply = connection->call_sync(
 			"/org/freedesktop/ScreenSaver",
@@ -86,7 +97,6 @@ std::optional<crl::time> FreedesktopDBusLastUserInputTime() {
 		return (crl::now() - static_cast<crl::time>(value));
 	} catch (const Glib::Error &e) {
 		static const auto NotSupportedErrors = {
-			"org.freedesktop.DBus.Error.Disconnected",
 			"org.freedesktop.DBus.Error.ServiceUnknown",
 			"org.freedesktop.DBus.Error.NotSupported",
 		};
@@ -123,8 +133,19 @@ std::optional<crl::time> MutterDBusLastUserInputTime() {
 	}
 
 	try {
-		const auto connection = Gio::DBus::Connection::get_sync(
-			Gio::DBus::BusType::BUS_TYPE_SESSION);
+		const auto connection = [] {
+			try {
+				return Gio::DBus::Connection::get_sync(
+					Gio::DBus::BusType::BUS_TYPE_SESSION);
+			} catch (...) {
+				return Glib::RefPtr<Gio::DBus::Connection>();
+			}
+		}();
+
+		if (!connection) {
+			NotSupported = true;
+			return std::nullopt;
+		}
 
 		auto reply = connection->call_sync(
 			"/org/gnome/Mutter/IdleMonitor/Core",
@@ -133,11 +154,10 @@ std::optional<crl::time> MutterDBusLastUserInputTime() {
 			{},
 			"org.gnome.Mutter.IdleMonitor");
 
-		const auto value = GlibVariantCast<uint>(reply.get_child(0));
+		const auto value = GlibVariantCast<guint64>(reply.get_child(0));
 		return (crl::now() - static_cast<crl::time>(value));
 	} catch (const Glib::Error &e) {
 		static const auto NotSupportedErrors = {
-			"org.freedesktop.DBus.Error.Disconnected",
 			"org.freedesktop.DBus.Error.ServiceUnknown",
 		};
 
