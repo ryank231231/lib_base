@@ -6,18 +6,21 @@
 //
 #pragma once
 
-#include "base/platform/win/base_windows_h.h"
+class QWidget;
 
 namespace base::Platform {
 
-class SystemMediaControlsWin {
+class SystemMediaControls {
 public:
 	enum class Command {
+		PlayPause,
 		Play,
 		Pause,
 		Next,
 		Previous,
 		Stop,
+		Quit,
+		Raise,
 		None,
 	};
 
@@ -27,10 +30,15 @@ public:
 		Stopped,
 	};
 
-	SystemMediaControlsWin();
-	~SystemMediaControlsWin();
+	SystemMediaControls();
+	~SystemMediaControls();
 
-	bool init(HWND hwnd);
+	bool init(std::optional<QWidget*> parent);
+
+	[[nodiscard]] bool seekingSupported() const;
+	[[nodiscard]] bool volumeSupported() const;
+
+	void setApplicationName(const QString &name);
 
 	void setEnabled(bool enabled);
 	void setIsNextEnabled(bool value);
@@ -41,21 +49,24 @@ public:
 	void setTitle(const QString &title);
 	void setArtist(const QString &artist);
 	void setThumbnail(const QImage &thumbnail);
+	void setDuration(int duration);
+	void setPosition(int position);
+	void setVolume(float64 volume);
 	void clearThumbnail();
 	void clearMetadata();
 	void updateDisplay();
 
 	[[nodiscard]] rpl::producer<Command> commandRequests() const;
+	[[nodiscard]] rpl::producer<float64> seekRequests() const;
+	[[nodiscard]] rpl::producer<float64> volumeChangeRequests() const;
+	[[nodiscard]] rpl::producer<> updatePositionRequests() const;
+
+	static bool Supported();
 
 private:
 	struct Private;
 
 	const std::unique_ptr<Private> _private;
-
-	bool _hasValidRegistrationToken = false;
-	bool _initialized = false;
-
-	rpl::event_stream<Command> _commandRequests;
 };
 
-}  // namespace base::Platform
+} // namespace base::Platform

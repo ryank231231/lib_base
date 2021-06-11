@@ -4,9 +4,10 @@
 // For license and copyright information please follow this link:
 // https://github.com/desktop-app/legal/blob/master/LEGAL
 //
-#include "base/platform/win/base_windows_system_media_controls.h"
+#include "base/platform/base_platform_system_media_controls.h"
 
 #include "base/integration.h"
+#include "base/platform/win/base_info_win.h"
 #include "base/platform/win/base_windows_wrl.h"
 #include "base/platform/win/wrl/wrl_event_h.h"
 
@@ -14,8 +15,12 @@
 #include <windows.media.control.h>
 #include <wrl/client.h>
 
+#include <qpa/qplatformnativeinterface.h>
+
 #include <QtCore/QBuffer>
+#include <QtGui/QGuiApplication>
 #include <QtGui/QImage>
+#include <QtWidgets/QWidget>
 
 namespace base::Platform {
 
@@ -30,7 +35,7 @@ using ButtonsEventArgs =
 using DisplayUpdater = WinMedia::ISystemMediaTransportControlsDisplayUpdater;
 using MediaType = ABI::Windows::Media::MediaPlaybackType;
 
-struct SystemMediaControlsWin::Private {
+struct SystemMediaControls::Private {
 	ComPtr<SMTControls> controls;
 	ComPtr<DisplayUpdater> displayUpdater;
 	ComPtr<WinMedia::IMusicDisplayProperties> displayProperties;
@@ -38,6 +43,10 @@ struct SystemMediaControlsWin::Private {
 	ComPtr<WinStreams::IRandomAccessStream> thumbStream;
 	ComPtr<WinStreams::IRandomAccessStreamReference> thumbStreamReference;
 	EventRegistrationToken registrationToken;
+	bool initialized = false;
+	bool hasValidRegistrationToken = false;
+
+	rpl::event_stream<SystemMediaControls::Command> commandRequests;
 };
 
 namespace {
@@ -45,22 +54,22 @@ namespace {
 using WinPlaybackStatus = ABI::Windows::Media::MediaPlaybackStatus;
 
 WinPlaybackStatus SmtcPlaybackStatus(
-		SystemMediaControlsWin::PlaybackStatus status) {
+		SystemMediaControls::PlaybackStatus status) {
 	switch (status) {
-	case SystemMediaControlsWin::PlaybackStatus::Playing:
+	case SystemMediaControls::PlaybackStatus::Playing:
 		return WinPlaybackStatus::MediaPlaybackStatus_Playing;
-	case SystemMediaControlsWin::PlaybackStatus::Paused:
+	case SystemMediaControls::PlaybackStatus::Paused:
 		return WinPlaybackStatus::MediaPlaybackStatus_Paused;
-	case SystemMediaControlsWin::PlaybackStatus::Stopped:
+	case SystemMediaControls::PlaybackStatus::Stopped:
 		return WinPlaybackStatus::MediaPlaybackStatus_Stopped;
 	}
-	Unexpected("SmtcPlaybackStatus in SystemMediaControlsWin");
+	Unexpected("SmtcPlaybackStatus in SystemMediaControls");
 }
 
 using SMTCButton = WinMedia::SystemMediaTransportControlsButton;
 
 auto SMTCButtonToCommand(SMTCButton button) {
-	using Command = SystemMediaControlsWin::Command;
+	using Command = SystemMediaControls::Command;
 
 	switch (button) {
 	case SMTCButton::SystemMediaTransportControlsButton_Play:
@@ -85,21 +94,34 @@ auto SMTCButtonToCommand(SMTCButton button) {
 
 } // namespace
 
-SystemMediaControlsWin::SystemMediaControlsWin()
+SystemMediaControls::SystemMediaControls()
 : _private(std::make_unique<Private>()) {
 }
 
-SystemMediaControlsWin::~SystemMediaControlsWin() {
-	if (_hasValidRegistrationToken) {
+SystemMediaControls::~SystemMediaControls() {
+	if (_private->hasValidRegistrationToken) {
 		_private->controls->remove_ButtonPressed(_private->registrationToken);
 		clearMetadata();
 	}
 }
 
-bool SystemMediaControlsWin::init(HWND hwnd) {
-	if (_initialized) {
-		return _initialized;
+bool SystemMediaControls::init(std::optional<QWidget*> parent) {
+	if (_private->initialized) {
+		return _private->initialized;
 	}
+	if (!parent.has_value()) {
+		return false;
+	}
+	const auto window = (*parent)->window()->windowHandle();
+	const auto native = QGuiApplication::platformNativeInterface();
+	if (!window || !native) {
+		return false;
+	}
+
+	// Should be moved to separated file.
+	const auto hwnd = static_cast<HWND>(native->nativeResourceForWindow(
+		QByteArrayLiteral("handle"),
+		window));
 
 	ComPtr<ISystemMediaTransportControlsInterop> interop;
 	auto hr = GetActivationFactory(
@@ -134,7 +156,7 @@ bool SystemMediaControlsWin::init(HWND hwnd) {
 				return E_FAIL;
 			}
 			Integration::Instance().enterFromEventLoop([&] {
-				_commandRequests.fire(SMTCButtonToCommand(button));
+				_private->commandRequests.fire(SMTCButtonToCommand(button));
 			});
 			return S_OK;
 		});
@@ -147,7 +169,7 @@ bool SystemMediaControlsWin::init(HWND hwnd) {
 			return false;
 		}
 
-		_hasValidRegistrationToken = true;
+		_private->hasValidRegistrationToken = true;
 	}
 
 	hr = _private->controls->put_IsEnabled(true);
@@ -173,49 +195,52 @@ bool SystemMediaControlsWin::init(HWND hwnd) {
 		return false;
 	}
 
-	_initialized = true;
+	_private->initialized = true;
 	return true;
 }
 
-void SystemMediaControlsWin::setEnabled(bool enabled) {
+void SystemMediaControls::setApplicationName(const QString &name) {
+}
+
+void SystemMediaControls::setEnabled(bool enabled) {
 	_private->controls->put_IsEnabled(enabled);
 }
 
-void SystemMediaControlsWin::setIsNextEnabled(bool value) {
+void SystemMediaControls::setIsNextEnabled(bool value) {
 	_private->controls->put_IsNextEnabled(value);
 }
 
-void SystemMediaControlsWin::setIsPreviousEnabled(bool value) {
+void SystemMediaControls::setIsPreviousEnabled(bool value) {
 	_private->controls->put_IsPreviousEnabled(value);
 }
 
-void SystemMediaControlsWin::setIsPlayPauseEnabled(bool value) {
+void SystemMediaControls::setIsPlayPauseEnabled(bool value) {
 	_private->controls->put_IsPlayEnabled(value);
 	_private->controls->put_IsPauseEnabled(value);
 }
 
-void SystemMediaControlsWin::setIsStopEnabled(bool value) {
+void SystemMediaControls::setIsStopEnabled(bool value) {
 	_private->controls->put_IsStopEnabled(value);
 }
 
-void SystemMediaControlsWin::setPlaybackStatus(
-		SystemMediaControlsWin::PlaybackStatus status) {
+void SystemMediaControls::setPlaybackStatus(
+		SystemMediaControls::PlaybackStatus status) {
 	_private->controls->put_PlaybackStatus(SmtcPlaybackStatus(status));
 }
 
-void SystemMediaControlsWin::setTitle(const QString &title) {
+void SystemMediaControls::setTitle(const QString &title) {
 	const auto wtitle = title.toStdWString();
 	_private->displayProperties->put_Title(
 		StringReferenceWrapper(wtitle.data(), wtitle.size()).Get());
 }
 
-void SystemMediaControlsWin::setArtist(const QString &artist) {
+void SystemMediaControls::setArtist(const QString &artist) {
 	const auto wartist = artist.toStdWString();
 	_private->displayProperties->put_Artist(
 		StringReferenceWrapper(wartist.data(), wartist.size()).Get());
 }
 
-void SystemMediaControlsWin::setThumbnail(const QImage &thumbnail) {
+void SystemMediaControls::setThumbnail(const QImage &thumbnail) {
 	const auto id = StringReferenceWrapper(
 		RuntimeClass_Windows_Storage_Streams_InMemoryRandomAccessStream);
 	auto hr = base::Platform::ActivateInstance(
@@ -320,25 +345,58 @@ void SystemMediaControlsWin::setThumbnail(const QImage &thumbnail) {
 	hr = storeAsyncOperation->put_Completed(storeAsyncCallback.Get());
 }
 
-void SystemMediaControlsWin::clearThumbnail() {
+void SystemMediaControls::setDuration(int duration) {
+}
+
+void SystemMediaControls::setPosition(int position) {
+}
+
+void SystemMediaControls::setVolume(float64 volume) {
+}
+
+void SystemMediaControls::clearThumbnail() {
 	_private->displayUpdater->put_Thumbnail(nullptr);
 	_private->displayUpdater->Update();
 }
 
-void SystemMediaControlsWin::clearMetadata() {
+void SystemMediaControls::clearMetadata() {
 	_private->displayUpdater->ClearAll();
 	_private->controls->put_IsEnabled(false);
 }
 
-void SystemMediaControlsWin::updateDisplay() {
+void SystemMediaControls::updateDisplay() {
 	_private->controls->put_IsEnabled(true);
 	_private->displayUpdater->put_Type(MediaType::MediaPlaybackType_Music);
 	_private->displayUpdater->Update();
 }
 
-auto SystemMediaControlsWin::commandRequests() const
--> rpl::producer<SystemMediaControlsWin::Command> {
-	return _commandRequests.events();
+auto SystemMediaControls::commandRequests() const
+-> rpl::producer<SystemMediaControls::Command> {
+	return _private->commandRequests.events();
 }
 
-}  // namespace base::Platform
+rpl::producer<float64> SystemMediaControls::seekRequests() const {
+	return rpl::never<float64>();
+}
+
+rpl::producer<float64> SystemMediaControls::volumeChangeRequests() const {
+	return rpl::never<float64>();
+}
+
+rpl::producer<> SystemMediaControls::updatePositionRequests() const {
+	return rpl::never<>();
+}
+
+bool SystemMediaControls::seekingSupported() const {
+	return false;
+}
+
+bool SystemMediaControls::volumeSupported() const {
+	return false;
+}
+
+bool SystemMediaControls::Supported() {
+	return ::Platform::IsWindows10OrGreater();
+}
+
+} // namespace base::Platform
