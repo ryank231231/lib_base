@@ -33,6 +33,7 @@ PRIVATE
     base/platform/linux/base_linux_dbus_utilities.h
     base/platform/linux/base_linux_glibmm_helper.h
     base/platform/linux/base_linux_gtk_integration_p.h
+    base/platform/linux/base_linux_gtk_integration_dummy.cpp
     base/platform/linux/base_linux_gtk_integration.cpp
     base/platform/linux/base_linux_gtk_integration.h
     base/platform/linux/base_linux_library.cpp
@@ -88,6 +89,8 @@ PRIVATE
     base/platform/win/base_windows_h.h
     base/platform/win/base_windows_safe_library.cpp
     base/platform/win/base_windows_safe_library.h
+    base/platform/win/base_windows_winrt.cpp
+    base/platform/win/base_windows_winrt.h
     base/platform/win/base_windows_wrl.cpp
     base/platform/win/base_windows_wrl.h
     base/platform/win/wrl/wrl_event_h.h
@@ -212,9 +215,8 @@ if (DESKTOP_APP_DISABLE_GTK_INTEGRATION)
         base/platform/linux/base_linux_xlib_helper.cpp
         base/platform/linux/base_linux_xlib_helper.h
     )
-
-    nice_target_sources(lib_base ${src_loc}
-    PRIVATE
+else()
+    remove_target_sources(lib_base ${src_loc}
         base/platform/linux/base_linux_gtk_integration_dummy.cpp
     )
 endif()
@@ -236,7 +238,9 @@ PUBLIC
     desktop-app::external_expected
 )
 
-if (LINUX)
+if (WIN32)
+    nuget_add_winrt(lib_base)
+elseif (LINUX)
     target_link_libraries(lib_base
     PUBLIC
         desktop-app::external_glibmm
