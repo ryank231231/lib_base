@@ -18,11 +18,9 @@
 
 #include <systemmediatransportcontrolsinterop.h>
 
-#include <qpa/qplatformnativeinterface.h>
-
 #include <QtCore/QBuffer>
-#include <QtGui/QGuiApplication>
 #include <QtGui/QImage>
+#include <QtGui/QWindow>
 #include <QtWidgets/QWidget>
 
 namespace winrt {
@@ -119,15 +117,12 @@ bool SystemMediaControls::init(std::optional<QWidget*> parent) {
 		return false;
 	}
 	const auto window = (*parent)->window()->windowHandle();
-	const auto native = QGuiApplication::platformNativeInterface();
-	if (!window || !native) {
+	if (!window) {
 		return false;
 	}
 
 	// Should be moved to separated file.
-	const auto hwnd = static_cast<HWND>(native->nativeResourceForWindow(
-		QByteArrayLiteral("handle"),
-		window));
+	const auto hwnd = reinterpret_cast<HWND>(window->winId());
 	if (!hwnd) {
 		return false;
 	}
