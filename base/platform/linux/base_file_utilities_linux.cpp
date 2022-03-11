@@ -12,7 +12,7 @@
 #include <QtCore/QProcess>
 #include <QtCore/QFile>
 #include <QtCore/QFileInfo>
-#include <QtCore/QDir>
+#include <QtCore/QStandardPaths>
 #include <QtGui/QDesktopServices>
 
 #ifndef DESKTOP_APP_DISABLE_DBUS_INTEGRATION
@@ -196,21 +196,24 @@ QString CurrentExecutablePath(int argc, char *argv[]) {
 		return appimagePath;
 	}
 
-	constexpr auto kMaxPath = 1024;
-	char result[kMaxPath] = { 0 };
-	auto count = readlink("/proc/self/exe", result, kMaxPath);
-	if (count > 0) {
-		auto filename = QFile::decodeName(result);
-		auto deletedPostfix = qstr(" (deleted)");
-		if (filename.endsWith(deletedPostfix)
-			&& !QFileInfo::exists(filename)) {
-			filename.chop(deletedPostfix.size());
-		}
-		return filename;
+	const auto exeLink = QFileInfo(u"/proc/%1/exe"_q.arg(getpid()));
+	if (exeLink.exists() && exeLink.isSymLink()) {
+		return exeLink.canonicalFilePath();
 	}
 
 	// Fallback to the first command line argument.
-	return argc ? QFile::decodeName(argv[0]) : QString();
+	if (argc) {
+		const auto argv0 = QFile::decodeName(argv[0]);
+		if (!argv0.isEmpty() && !QFileInfo::exists(argv0)) {
+			const auto argv0InPath = QStandardPaths::findExecutable(argv0);
+			if (!argv0InPath.isEmpty()) {
+				return argv0InPath;
+			}
+		}
+		return argv0;
+	}
+
+	return QString();
 }
 
 void RemoveQuarantine(const QString &path) {
