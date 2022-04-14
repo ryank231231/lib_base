@@ -30,7 +30,8 @@ namespace {
 #ifndef DESKTOP_APP_DISABLE_X11_INTEGRATION
 constexpr auto kResetScreenSaverTimeout = 10 * crl::time(1000);
 
-// Due to https://gitlab.freedesktop.org/xorg/xserver/-/issues/363 use the basic reset API
+// Use the basic reset API
+// due to https://gitlab.freedesktop.org/xorg/xserver/-/issues/363
 void XCBPreventDisplaySleep(bool prevent) {
 	static rpl::lifetime lifetime;
 	if (!prevent) {
@@ -65,33 +66,15 @@ void PortalPreventAppSuspension(
 		if (!prevent && !requestPath.empty()) {
 			connection->call_sync(
 				requestPath,
-				std::string(XDP::kXDPRequestInterface),
+				std::string(XDP::kRequestInterface),
 				"Close",
 				{},
-				std::string(XDP::kXDPService));
+				std::string(XDP::kService));
 			requestPath = "";
 			return;
 		} else if (!(prevent && requestPath.empty())) {
 			return;
 		}
-
-		const auto windowId = [&]() -> Glib::ustring {
-			std::stringstream result;
-			if (!window) {
-				return result.str();
-			}
-
-			if (const auto integration = WaylandIntegration::Instance()) {
-				if (const auto handle = integration->nativeHandle(window)
-					; !handle.isEmpty()) {
-					result << "wayland:" << handle.toStdString();
-				}
-			} else if (::Platform::IsX11()) {
-				result << "x11:" << std::hex << window->winId();
-			}
-
-			return result.str();
-		}();
 
 		const auto handleToken = Glib::ustring("desktop_app")
 			+ std::to_string(base::RandomValue<uint>());
@@ -123,8 +106,8 @@ void PortalPreventAppSuspension(
 				const Glib::VariantContainerBase &parameters) {
 				loop->quit();
 			},
-			std::string(XDP::kXDPService),
-			std::string(XDP::kXDPRequestInterface),
+			std::string(XDP::kService),
+			std::string(XDP::kRequestInterface),
 			"Response",
 			requestPath);
 
@@ -135,11 +118,12 @@ void PortalPreventAppSuspension(
 		});
 
 		connection->call_sync(
-			std::string(XDP::kXDPObjectPath),
+			std::string(XDP::kObjectPath),
 			"org.freedesktop.portal.Inhibit",
 			"Inhibit",
 			Glib::VariantContainerBase::create_tuple({
-				Glib::Variant<Glib::ustring>::create(windowId),
+				Glib::Variant<Glib::ustring>::create(
+					XDP::ParentWindowID(window)),
 				Glib::Variant<uint>::create(4), // Suspend
 				Glib::Variant<std::map<
 					Glib::ustring,
@@ -151,11 +135,12 @@ void PortalPreventAppSuspension(
 					},
 					{
 						"reason",
-						Glib::Variant<Glib::ustring>::create(description.toStdString())
+						Glib::Variant<Glib::ustring>::create(
+							description.toStdString())
 					},
 				}),
 			}),
-			std::string(XDP::kXDPService));
+			std::string(XDP::kService));
 
 		if (signalId != 0) {
 			QWindow tempWindow;
