@@ -45,7 +45,8 @@ ReplyPointer<T> MakeReplyPointer(T *reply) {
 }
 
 xcb_connection_t *GetConnectionFromQt();
-std::optional<xcb_timestamp_t> GetAppTimeFromQt();
+
+std::optional<xcb_timestamp_t> GetTimestamp();
 
 std::optional<xcb_window_t> GetRootWindow(xcb_connection_t *connection);
 
@@ -65,6 +66,7 @@ std::optional<xcb_window_t> GetSupportingWMCheck(
 		xcb_connection_t *connection,
 		xcb_window_t root);
 
-bool IsSupportedByWM(const QString &atomName);
+// convenient API, checks connection for nullptr
+bool IsSupportedByWM(xcb_connection_t *connection, const QString &atomName);
 
 } // namespace base::Platform::XCB
