@@ -13,9 +13,11 @@
 #include "base/platform/linux/base_linux_glibmm_helper.h"
 #endif // !DESKTOP_APP_DISABLE_DBUS_INTEGRATION
 
-#include <QtCore/QFile>
 #include <QtCore/QProcess>
 #include <QtWidgets/QWidget>
+
+#include <kshell.h>
+#include <ksandbox.h>
 
 #ifndef DESKTOP_APP_DISABLE_DBUS_INTEGRATION
 #include <gio/gio.h>
@@ -30,32 +32,6 @@ namespace {
 constexpr auto kSnapcraftSettingsService = "io.snapcraft.Settings"_cs;
 constexpr auto kSnapcraftSettingsObjectPath = "/io/snapcraft/Settings"_cs;
 constexpr auto kSnapcraftSettingsInterface = kSnapcraftSettingsService;
-
-[[nodiscard]] QByteArray EscapeShell(const QByteArray &content) {
-	auto result = QByteArray();
-
-	auto b = content.constData(), e = content.constEnd();
-	for (auto ch = b; ch != e; ++ch) {
-		if (*ch == ' ' || *ch == '"' || *ch == '\'' || *ch == '\\') {
-			if (result.isEmpty()) {
-				result.reserve(content.size() * 2);
-			}
-			if (ch > b) {
-				result.append(b, ch - b);
-			}
-			result.append('\\');
-			b = ch;
-		}
-	}
-	if (result.isEmpty()) {
-		return content;
-	}
-
-	if (e > b) {
-		result.append(b, e - b);
-	}
-	return result;
-}
 
 void SnapDefaultHandler(const QString &protocol) {
 	try {
@@ -125,15 +101,12 @@ bool CheckUrlScheme(const UrlSchemeDescriptor &descriptor) {
 		const auto handlerType = QString("x-scheme-handler/%1")
 			.arg(descriptor.protocol);
 
-		QByteArray escapedArguments;
-		for (const auto &arg : QProcess::splitCommand(descriptor.arguments)) {
-			escapedArguments += ' ' + EscapeShell(QFile::encodeName(arg));
-		}
-
-		const auto neededCommandline = QString("%1 -- %u")
-			.arg(QString(
-				EscapeShell(QFile::encodeName(descriptor.executable))
-					+ escapedArguments));
+		const auto neededCommandline = KShell::joinArgs(QStringList{
+			descriptor.executable,
+		} + KShell::splitArgs(descriptor.arguments) + QStringList{
+			"--",
+			"%u",
+		}).toUtf8();
 
 		const auto currentAppInfo = Gio::AppInfo::get_default_for_type(
 			handlerType.toStdString(),
@@ -155,7 +128,7 @@ bool CheckUrlScheme(const UrlSchemeDescriptor &descriptor) {
 void RegisterUrlScheme(const UrlSchemeDescriptor &descriptor) {
 #ifndef DESKTOP_APP_DISABLE_DBUS_INTEGRATION
 	try {
-		if (qEnvironmentVariableIsSet("SNAP")) {
+		if (KSandbox::isSnap()) {
 			SnapDefaultHandler(descriptor.protocol);
 			return;
 		}
@@ -168,15 +141,11 @@ void RegisterUrlScheme(const UrlSchemeDescriptor &descriptor) {
 		const auto handlerType = QString("x-scheme-handler/%1")
 			.arg(descriptor.protocol);
 
-		QByteArray escapedArguments;
-		for (const auto &arg : QProcess::splitCommand(descriptor.arguments)) {
-			escapedArguments += ' ' + EscapeShell(QFile::encodeName(arg));
-		}
-
-		const auto commandlineForCreator = QString("%1 --")
-			.arg(QString(
-				EscapeShell(QFile::encodeName(descriptor.executable))
-					+ escapedArguments));
+		const auto commandlineForCreator = KShell::joinArgs(QStringList{
+			descriptor.executable,
+		} + KShell::splitArgs(descriptor.arguments) + QStringList{
+			"--",
+		}).toUtf8();
 
 		const auto newAppInfo = Gio::AppInfo::create_from_commandline(
 			commandlineForCreator.toStdString(),
@@ -187,7 +156,8 @@ void RegisterUrlScheme(const UrlSchemeDescriptor &descriptor) {
 			newAppInfo->set_as_default_for_type(handlerType.toStdString());
 		}
 	} catch (const Glib::Error &e) {
-		LOG(("Register Url Scheme Error: %1").arg(QString::fromStdString(e.what())));
+		LOG(("Register Url Scheme Error: %1").arg(
+			QString::fromStdString(e.what())));
 	}
 #endif // !DESKTOP_APP_DISABLE_DBUS_INTEGRATION
 }
@@ -197,15 +167,12 @@ void UnregisterUrlScheme(const UrlSchemeDescriptor &descriptor) {
 	const auto handlerType = QString("x-scheme-handler/%1")
 		.arg(descriptor.protocol);
 
-	QByteArray escapedArguments;
-	for (const auto &arg : QProcess::splitCommand(descriptor.arguments)) {
-		escapedArguments += ' ' + EscapeShell(QFile::encodeName(arg));
-	}
-
-	const auto neededCommandline = QString("%1 -- %u")
-		.arg(QString(
-			EscapeShell(QFile::encodeName(descriptor.executable))
-				+ escapedArguments));
+	const auto neededCommandline = KShell::joinArgs(QStringList{
+		descriptor.executable,
+	} + KShell::splitArgs(descriptor.arguments) + QStringList{
+		"--",
+		"%u",
+	}).toUtf8();
 
 	auto registeredAppInfoList = g_app_info_get_recommended_for_type(
 		handlerType.toUtf8().constData());
