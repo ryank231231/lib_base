@@ -38,7 +38,7 @@ namespace {
 bool PortalShowInFolder(const QString &filepath) {
 	try {
 		const auto connection = Gio::DBus::Connection::get_sync(
-			Gio::DBus::BusType::BUS_TYPE_SESSION);
+			Gio::DBus::BusType::SESSION);
 
 		const auto fd = open(
 			QFile::encodeName(filepath).constData(),
@@ -60,8 +60,6 @@ bool PortalShowInFolder(const QString &filepath) {
 			return {};
 		}();
 
-		const auto fdList = Gio::UnixFDList::create();
-		fdList->append(fd);
 		auto outFdList = Glib::RefPtr<Gio::UnixFDList>();
 
 		connection->call_sync(
@@ -70,7 +68,7 @@ bool PortalShowInFolder(const QString &filepath) {
 			"OpenDirectory",
 			Glib::VariantContainerBase::create_tuple({
 				Glib::Variant<Glib::ustring>::create({}),
-				Glib::wrap(g_variant_new_handle(0)),
+				Glib::Variant<int>::create_handle(0),
 				Glib::Variant<std::map<
 					Glib::ustring,
 					Glib::VariantBase
@@ -81,7 +79,7 @@ bool PortalShowInFolder(const QString &filepath) {
 					},
 				}),
 			}),
-			fdList,
+			Gio::UnixFDList::create(std::vector<int>{ fd }),
 			outFdList,
 			"org.freedesktop.portal.Desktop");
 
@@ -95,7 +93,7 @@ bool PortalShowInFolder(const QString &filepath) {
 bool DBusShowInFolder(const QString &filepath) {
 	try {
 		const auto connection = Gio::DBus::Connection::get_sync(
-			Gio::DBus::BusType::BUS_TYPE_SESSION);
+			Gio::DBus::BusType::SESSION);
 
 		const auto startupId = []() -> Glib::ustring {
 			if (const auto integration = WaylandIntegration::Instance()) {

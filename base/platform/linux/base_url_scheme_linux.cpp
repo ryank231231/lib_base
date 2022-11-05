@@ -36,7 +36,7 @@ constexpr auto kSnapcraftSettingsInterface = kSnapcraftSettingsService;
 void SnapDefaultHandler(const QString &protocol) {
 	try {
 		const auto connection = Gio::DBus::Connection::get_sync(
-			Gio::DBus::BusType::BUS_TYPE_SESSION);
+			Gio::DBus::BusType::SESSION);
 
 		auto reply = connection->call_sync(
 			std::string(kSnapcraftSettingsObjectPath),
@@ -54,7 +54,7 @@ void SnapDefaultHandler(const QString &protocol) {
 		const auto expectedHandler = qEnvironmentVariable("SNAP_NAME")
 			+ ".desktop";
 
-		if (currentHandler == expectedHandler.toStdString()) {
+		if (currentHandler.c_str() == expectedHandler) {
 			return;
 		}
 
@@ -72,7 +72,7 @@ void SnapDefaultHandler(const QString &protocol) {
 			[&](const Glib::RefPtr<Gio::AsyncResult> &result) {
 				try {
 					connection->call_finish(result);
-				} catch (const Glib::Error &e) {
+				} catch (const std::exception &e) {
 					LOG(("Snap Default Handler Error: %1")
 						.arg(QString::fromStdString(e.what())));
 				}
@@ -86,7 +86,7 @@ void SnapDefaultHandler(const QString &protocol) {
 		window.setWindowModality(Qt::ApplicationModal);
 		window.show();
 		loop->run();
-	} catch (const Glib::Error &e) {
+	} catch (const std::exception &e) {
 		LOG(("Snap Default Handler Error: %1")
 			.arg(QString::fromStdString(e.what())));
 	}
@@ -97,28 +97,25 @@ void SnapDefaultHandler(const QString &protocol) {
 
 bool CheckUrlScheme(const UrlSchemeDescriptor &descriptor) {
 #ifndef DESKTOP_APP_DISABLE_DBUS_INTEGRATION
-	try {
-		const auto handlerType = QString("x-scheme-handler/%1")
-			.arg(descriptor.protocol);
+	const auto handlerType = QString("x-scheme-handler/%1")
+		.arg(descriptor.protocol);
 
-		const auto neededCommandline = KShell::joinArgs(QStringList{
-			descriptor.executable,
-		} + KShell::splitArgs(descriptor.arguments) + QStringList{
-			"--",
-			"%u",
-		}).toUtf8();
+	const auto neededCommandline = KShell::joinArgs(QStringList{
+		descriptor.executable,
+	} + KShell::splitArgs(descriptor.arguments) + QStringList{
+		"--",
+		"%u",
+	}).toUtf8();
 
-		const auto currentAppInfo = Gio::AppInfo::get_default_for_type(
-			handlerType.toStdString(),
-			true);
+	const auto currentAppInfo = Gio::AppInfo::get_default_for_type(
+		handlerType.toStdString(),
+		true);
 
-		if (currentAppInfo) {
-			const auto currentCommandline = QString::fromStdString(
-				currentAppInfo->get_commandline());
+	if (currentAppInfo) {
+		const auto currentCommandline = QString::fromStdString(
+			currentAppInfo->get_commandline());
 
-			return currentCommandline == neededCommandline;
-		}
-	} catch (...) {
+		return currentCommandline == neededCommandline;
 	}
 #endif // !DESKTOP_APP_DISABLE_DBUS_INTEGRATION
 
@@ -150,12 +147,12 @@ void RegisterUrlScheme(const UrlSchemeDescriptor &descriptor) {
 		const auto newAppInfo = Gio::AppInfo::create_from_commandline(
 			commandlineForCreator.toStdString(),
 			descriptor.displayAppName.toStdString(),
-			Gio::AppInfoCreateFlags::APP_INFO_CREATE_SUPPORTS_URIS);
+			Gio::AppInfo::CreateFlags::SUPPORTS_URIS);
 
 		if (newAppInfo) {
 			newAppInfo->set_as_default_for_type(handlerType.toStdString());
 		}
-	} catch (const Glib::Error &e) {
+	} catch (const std::exception &e) {
 		LOG(("Register Url Scheme Error: %1").arg(
 			QString::fromStdString(e.what())));
 	}
