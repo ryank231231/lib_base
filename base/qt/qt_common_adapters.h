@@ -7,6 +7,7 @@
 #pragma once
 
 #include <QtNetwork/QLocalSocket>
+#include <QtNetwork/QTcpSocket>
 #include <QtNetwork/QNetworkReply>
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)

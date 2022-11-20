@@ -53,7 +53,7 @@ using TimeId = int32;
 #ifndef _DEBUG
 
 #ifdef _MSC_VER
-#define DESKTOP_APP_USE_NO_ALLOCATION_LITERAL
+// #define DESKTOP_APP_USE_NO_ALLOCATION_LITERAL
 #endif // _MSC_VER
 
 #endif // !_DEBUG
@@ -104,9 +104,9 @@ struct StaticStringData {
 	QArrayData data;
 	char16_t text[N];
 
-	QStringData *pointer() {
+	QString *pointer() {
 		Q_ASSERT(data.ref.isStatic());
-		return static_cast<QStringData*>(&data);
+		return static_cast<QString*>(&data);
 	}
 };
 
