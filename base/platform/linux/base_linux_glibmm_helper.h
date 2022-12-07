@@ -10,11 +10,11 @@
 
 #include <glibmm/variant.h>
 
+#ifdef _LP64
 namespace Glib {
 
 template <>
-class Variant<int64> : public VariantBase
-{
+class Variant<int64> : public VariantBase {
 public:
 	using CType = gint64;
 
@@ -58,8 +58,7 @@ public:
 };
 
 template <>
-class Variant<uint64> : public VariantBase
-{
+class Variant<uint64> : public VariantBase {
 public:
 	using CType = guint64;
 
@@ -103,6 +102,7 @@ public:
 };
 
 } // namespace Glib
+#endif // 64bit
 
 namespace base {
 namespace Platform {
