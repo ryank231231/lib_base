@@ -6,6 +6,8 @@
 //
 #pragma once
 
+#include <vector>
+
 class QJsonObject;
 class QString;
 class QDate;
