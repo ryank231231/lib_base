@@ -17,6 +17,9 @@ get_filename_component(src_loc . REALPATH)
 target_precompile_headers(lib_base PRIVATE $<$<COMPILE_LANGUAGE:CXX,OBJCXX>:${src_loc}/base/base_pch.h>)
 nice_target_sources(lib_base ${src_loc}
 PRIVATE
+    base/platform/linux/base_battery_saving_linux.cpp
+    base/platform/linux/base_battery_saving_linux_dummy.cpp
+    base/platform/linux/base_battery_saving_linux.h
     base/platform/linux/base_file_utilities_linux.cpp
     base/platform/linux/base_file_utilities_linux.h
     base/platform/linux/base_global_shortcuts_linux.cpp
@@ -54,6 +57,8 @@ PRIVATE
     base/platform/linux/base_system_media_controls_linux.cpp
     base/platform/linux/base_url_scheme_linux.cpp
     base/platform/linux/base_url_scheme_linux.h
+    base/platform/mac/base_battery_saving_mac.mm
+    base/platform/mac/base_battery_saving_mac.h
     base/platform/mac/base_confirm_quit.h
     base/platform/mac/base_confirm_quit.mm
     base/platform/mac/base_custom_app_icon_mac.h
@@ -78,6 +83,8 @@ PRIVATE
     base/platform/mac/base_url_scheme_mac.mm
     base/platform/mac/base_utilities_mac.h
     base/platform/mac/base_utilities_mac.mm
+    base/platform/win/base_battery_saving_win.cpp
+    base/platform/win/base_battery_saving_win.h
     base/platform/win/base_file_utilities_win.cpp
     base/platform/win/base_file_utilities_win.h
     base/platform/win/base_global_shortcuts_win.cpp
@@ -126,6 +133,8 @@ PRIVATE
     base/base_file_utilities.cpp
     base/base_file_utilities.h
     base/basic_types.h
+    base/battery_saving.cpp
+    base/battery_saving.h
     base/binary_guard.h
     base/build_config.h
     base/bytes.cpp
@@ -214,6 +223,7 @@ if (DESKTOP_APP_DISABLE_DBUS_INTEGRATION)
     remove_target_sources(lib_base ${src_loc}
         base/platform/linux/base_linux_app_launch_context.cpp
         base/platform/linux/base_linux_app_launch_context.h
+        base/platform/linux/base_battery_saving_linux.cpp
         base/platform/linux/base_linux_dbus_utilities.cpp
         base/platform/linux/base_linux_dbus_utilities.h
         base/platform/linux/base_linux_glibmm_helper.h
@@ -223,6 +233,7 @@ if (DESKTOP_APP_DISABLE_DBUS_INTEGRATION)
     )
 else()
     remove_target_sources(lib_base ${src_loc}
+        base/platform/linux/base_battery_saving_linux_dummy.cpp
         base/platform/linux/base_system_media_controls_linux_dummy.cpp
     )
 endif()
