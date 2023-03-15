@@ -28,6 +28,8 @@
 #include <X11/keysym.h>
 #endif // !DESKTOP_APP_DISABLE_X11_INTEGRATION
 
+class QKeyEvent;
+
 namespace base::Platform::GlobalShortcuts {
 namespace {
 
@@ -665,6 +667,10 @@ QString KeyName(GlobalShortcutKeyGeneric descriptor) {
 #endif // !DESKTOP_APP_DISABLE_X11_INTEGRATION
 
 	return {};
+}
+
+bool IsToggleFullScreenKey(not_null<QKeyEvent*> e) {
+	return false;
 }
 
 } // namespace base::Platform::GlobalShortcuts
