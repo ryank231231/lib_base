@@ -17,7 +17,7 @@ namespace {
 int32_t(__stdcall *CoIncrementMTAUsage)(void** cookie);
 int32_t(__stdcall *RoInitialize)(uint32_t type);
 int32_t(__stdcall *GetRestrictedErrorInfo)(void** info);
-int32_t(__stdcall *RoGetActivationFactory)(void* classId, winrt::guid const& iid, void** factory);
+//int32_t(__stdcall *RoGetActivationFactory)(void* classId, winrt::guid const& iid, void** factory);
 int32_t(__stdcall *RoOriginateLanguageException)(int32_t error, void* message, void* exception);
 int32_t(__stdcall *SetRestrictedErrorInfo)(void* info);
 int32_t(__stdcall *WindowsCreateString)(wchar_t const* sourceString, uint32_t length, void** string);
@@ -36,7 +36,7 @@ wchar_t const*(__stdcall *WindowsGetStringRawBuffer)(void* string, uint32_t* len
 	return LOAD_SYMBOL(ole32, CoIncrementMTAUsage)
 		&& LOAD_SYMBOL(combase, RoInitialize)
 		&& LOAD_SYMBOL(combase, GetRestrictedErrorInfo)
-		&& LOAD_SYMBOL(combase, RoGetActivationFactory)
+		// && LOAD_SYMBOL(combase, RoGetActivationFactory)
 		&& LOAD_SYMBOL(combase, RoOriginateLanguageException)
 		&& LOAD_SYMBOL(combase, SetRestrictedErrorInfo)
 		&& LOAD_SYMBOL(combase, WindowsCreateString)
@@ -75,9 +75,11 @@ int32_t __stdcall WINRT_GetRestrictedErrorInfo(void** info) noexcept {
 	return P::GetRestrictedErrorInfo(info);
 }
 
+/*
 int32_t __stdcall WINRT_RoGetActivationFactory(void* classId, winrt::guid const& iid, void** factory) noexcept {
 	return P::RoGetActivationFactory(classId, iid, factory);
 }
+*/
 
 int32_t __stdcall WINRT_RoOriginateLanguageException(int32_t error, void* message, void* exception) noexcept {
 	return P::RoOriginateLanguageException(error, message, exception);

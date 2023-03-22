@@ -15,12 +15,12 @@ namespace base::Platform {
 namespace {
 
 using namespace ::Platform;
-
-HRESULT(__stdcall *RoGetActivationFactory)(
-	_In_ HSTRING activatableClassId,
-	_In_ REFIID iid,
-	_COM_Outptr_ void ** factory);
-
+//
+//HRESULT(__stdcall *RoGetActivationFactory)(
+//	_In_ HSTRING activatableClassId,
+//	_In_ REFIID iid,
+//	_COM_Outptr_ void ** factory);
+//
 HRESULT(__stdcall *RoActivateInstance)(
 	_In_ HSTRING activatableClassId,
 	_COM_Outptr_ IInspectable** instance);
@@ -82,10 +82,10 @@ bool SupportsWRL() {
 		return state.supported;
 	}
 	state.inited = true;
-	if (IsWindows8OrGreater()) {
+	if (true) {
 		const auto combase = SafeLoadLibrary(L"combase.dll");
 		state.supported = combase
-			&& LOAD_SYMBOL(combase, RoGetActivationFactory)
+			// && LOAD_SYMBOL(combase, RoGetActivationFactory)
 			&& LOAD_SYMBOL(combase, RoActivateInstance)
 			&& LOAD_SYMBOL(combase, RoRegisterActivationFactories)
 			&& LOAD_SYMBOL(combase, RoRevokeActivationFactories)
@@ -114,15 +114,15 @@ _Check_return_ HRESULT WINAPI RoActivateInstance(
 		: CO_E_DLLNOTFOUND;
 }
 
-_Check_return_ HRESULT WINAPI RoGetActivationFactory(
-	_In_ HSTRING activatableClassId,
-	_In_ REFIID iid,
-	_COM_Outptr_ void** factory
-) {
-	return P::SupportsWRL()
-		? P::RoGetActivationFactory(activatableClassId, iid, factory)
-		: CO_E_DLLNOTFOUND;
-}
+//_Check_return_ HRESULT WINAPI RoGetActivationFactory(
+//	_In_ HSTRING activatableClassId,
+//	_In_ REFIID iid,
+//	_COM_Outptr_ void** factory
+//) {
+//	return P::SupportsWRL()
+//		? P::RoGetActivationFactory(activatableClassId, iid, factory)
+//		: CO_E_DLLNOTFOUND;
+//}
 
 _Check_return_ HRESULT WINAPI RoRegisterActivationFactories(
 	_In_reads_(count) HSTRING* activatableClassIds,

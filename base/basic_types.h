@@ -53,7 +53,7 @@ using TimeId = int32;
 #ifndef _DEBUG
 
 #ifdef _MSC_VER
-#define DESKTOP_APP_USE_NO_ALLOCATION_LITERAL
+// #define DESKTOP_APP_USE_NO_ALLOCATION_LITERAL
 #endif // _MSC_VER
 
 #endif // !_DEBUG
@@ -96,17 +96,17 @@ template <size_t N>
 struct StaticStringData {
 	template <std::size_t... I>
 	constexpr StaticStringData(
-		const char16_t (&text)[N],
+		const char16_t(&text)[N],
 		std::index_sequence<I...>)
-	: data Q_STATIC_STRING_DATA_HEADER_INITIALIZER(N - 1)
-	, text{ text[I]... } {
+		: data Q_STATIC_STRING_DATA_HEADER_INITIALIZER(N - 1)
+		, text{ text[I]... } {
 	}
 	QArrayData data;
 	char16_t text[N];
 
-	QStringData *pointer() {
+	QString* pointer() {
 		Q_ASSERT(data.ref.isStatic());
-		return static_cast<QStringData*>(&data);
+		return static_cast<QString*>(&data);
 	}
 };
 

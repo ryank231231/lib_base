@@ -31,7 +31,12 @@ private:
 	bool nativeEventFilter(
 		const QByteArray &eventType,
 		void *message,
-		long *result) override;
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+		long** result
+#else
+		qintptr* result
+#endif
+		) override;
 
 	QWidget _fake;
 	HWND _hwnd = nullptr;
@@ -86,7 +91,11 @@ std::optional<bool> BatterySaving::enabled() const {
 bool BatterySaving::nativeEventFilter(
 		const QByteArray &eventType,
 		void *message,
-		long *result) {
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+	long** result) {
+#else
+	qintptr* result) {
+#endif
 	Expects(_hwnd != nullptr);
 
 	const auto msg = static_cast<MSG*>(message);
